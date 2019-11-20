@@ -3,3 +3,4 @@ intermediate/
 output/
 playground/
 .snakemake*
+.DS_Store
