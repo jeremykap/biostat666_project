@@ -10,12 +10,13 @@ VCF_DIR = Path("input/vcf")
 ASSOC_DIR = Path("input/gwas")
 INT_DIR = Path("intermediate/")
 REF_FASTA = Path("input/human_g1k_v37.fasta")
-OUTPUT_DIR = Path("")
+OUT_DIR = Path("output/")
 rule norm_vcf:
     input: vcf=VCF_DIR / "ALL.chr{chr}.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz",ref=REF_FASTA
     output: INT_DIR / "chr{chr}_normed.bcf"
     shell:
         """
+        mkdir -p $(dirname {output})
         bcftools norm -m-any --check-ref w -f {input.ref} {input.vcf} | \
         bcftools annotate -x ID -I +'%CHROM:%POS:%REF:%ALT' | \
         bcftools norm -Ob --rm-dup both > {output}
@@ -50,8 +51,9 @@ rule merge_chroms:
         """
 rule clump_snps:
     input: data=rules.merge_chroms.output, asso=expand(rules.reformat_assoc.output,study=STUDIES)
-    output: "plink.clumped"
+    output: OUT_DIR / "gwas_snps.clumped"
     shell:
         """
-        plink --bfile {INT_DIR}/merged --clump {input.asso}
+        mkdir -p $(dirname "{output}")
+        plink --bfile {INT_DIR}/merged --clump {input.asso} --out {OUT_DIR}/gwas_snps
         """
