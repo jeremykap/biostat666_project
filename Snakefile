@@ -26,13 +26,16 @@ rule norm_vcf:
 
 # Rule to convert BCF to PLINK format
 rule vcf_to_plink:
-    input: rules.norm_vcf.output
+    input: 
+        vcf=rules.norm_vcf.output,
+        indivs="input/europeanids.txt"
     output: INT_DIR/"chr{chr}.bed"
     shell:
         """
-        plink --noweb --bcf {input} \
-         --keep-allele-order --vcf-idspace-to _ --const-fid --allow-extra-chr 0 --split-x b37 no-fail --make-bed \
-        --out {INT_DIR}/chr{wildcards.chr}
+        plink --noweb \
+        --bcf {input.vcf} --keep {input.indivs} --keep-allele-order \
+        --vcf-idspace-to _ --const-fid --allow-extra-chr 0 --split-x b37 no-fail \
+        --make-bed --out {INT_DIR}/chr{wildcards.chr}
         """
 
 # Merge PLINK chromosome files
