@@ -13,27 +13,46 @@ ASSOC_DIR = Path("input/gwas")
 INT_DIR = Path("intermediate/")
 OUT_DIR = Path("output/")
 
-# Rule to filter VCF to only SNVs, 
-rule norm_vcf:
-    input: vcf=VCF_DIR / "ALL.chr{chr}.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz"
-    output: INT_DIR / "chr{chr}_normed.bcf"
+# Filter 1K genomes panel to only include european individuals
+rule filter_sample_list:
+    input: "input/integrated_call_samples_v3.20130502.ALL.panel"
+    output: str(INT_DIR / "european_ids.txt")
+    shell:
+        """
+        awk '{{ if ($3=="EUR") print; }}' {input} | cut -f1 > {output}
+        """
+rule vcf_to_bcf:
+    input: 
+        vcf=VCF_DIR / "ALL.chr{chr}.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz",
+    output: str(INT_DIR / "raw_bcf" /  "chr{chr}.bcf")
     shell:
         """
         mkdir -p $(dirname {output})
-        bcftools view -v snps {input.vcf} | bcftools norm -Ob --rm-dup both > {output}
+        bcftools view {input} -Ob > {output}
+        bcftools index {output}
+        """
+# Rule to filter VCF to only SNVs, and only include european individuals
+rule norm_filter_bcf:
+    input: 
+        bcf= rules.vcf_to_bcf.output,
+        sample_list=rules.filter_sample_list.output
+    output: INT_DIR / "normed_vcf" / "chr{chr}_normed.bcf"
+    shell:
+        """
+        mkdir -p $(dirname {output})
+        bcftools view -S {input.sample_list} -v snps {input.bcf} | bcftools norm -Ob --rm-dup both > {output}
         bcftools index {output}
         """
 
 # Rule to convert BCF to PLINK format
 rule vcf_to_plink:
     input: 
-        vcf=rules.norm_vcf.output,
-        indivs="input/europeanids.txt"
+        vcf=rules.norm_filter_bcf.output,
     output: INT_DIR/"chr{chr}.bed"
     shell:
         """
         plink --noweb \
-        --bcf {input.vcf} --keep {input.indivs} --keep-allele-order \
+        --bcf {input.vcf} --keep-allele-order \
         --vcf-idspace-to _ --const-fid --allow-extra-chr 0 --split-x b37 no-fail \
         --make-bed --out {INT_DIR}/chr{wildcards.chr}
         """
