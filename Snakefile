@@ -13,6 +13,9 @@ ASSOC_DIR = Path("input/gwas")
 INT_DIR = Path("intermediate/")
 OUT_DIR = Path("output/")
 
+rule all:
+    input: expand(str(OUT_DIR / "chr{chr}.clumped"),chr=CHROMS_INCLUDED)
+
 # Filter 1K genomes panel to only include european individuals
 rule filter_sample_list:
     input: "input/integrated_call_samples_v3.20130502.ALL.panel"
@@ -57,26 +60,12 @@ rule vcf_to_plink:
         --make-bed --out {INT_DIR}/chr{wildcards.chr}
         """
 
-# Merge PLINK chromosome files
-rule merge_chroms:
-    input: expand(rules.vcf_to_plink.output,chr=CHROMS_INCLUDED)
-    output: INT_DIR / "merged.bed"
-    shell:
-        """
-        rm -f {INT_DIR}/merge_list
-        for line in {CHROMS_INCLUDED}
-        do
-            echo "{INT_DIR}/chr$line" >> {INT_DIR}/merge_list
-        done
-        plink --merge-list {INT_DIR}/merge_list --out {INT_DIR}/merged
-        """
-
-# Joint clumping of SNPs
+# Chromosome wise clumping of SNPs clumping of SNPs
 rule clump_snps:
-    input: data=rules.merge_chroms.output, asso=expand(str(ASSOC_DIR / "{study}"),study=STUDIES)
-    output: OUT_DIR / "gwas_snps.clumped"
+    input: data=rules.vcf_to_plink.output, asso=expand(str(ASSOC_DIR / "{study}"),study=STUDIES)
+    output: OUT_DIR / "chr{chr}.clumped"
     shell:
         """
         mkdir -p $(dirname "{output}")
-        plink --bfile {INT_DIR}/merged --clump {input.asso} --out {OUT_DIR}/gwas_snps
+        plink --bfile {INT_DIR}/merged --clump {input.asso} --out {OUT_DIR}/chr{wildcards.chr}
         """
