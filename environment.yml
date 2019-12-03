@@ -1,5 +1,7 @@
 name: b666prj
 channels:
+  - bioconda
+  - conda-forge
   - defaults
 dependencies:
   - plink
