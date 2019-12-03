@@ -13,8 +13,11 @@ ASSOC_DIR = Path("input/gwas")
 INT_DIR = Path("intermediate/")
 OUT_DIR = Path("output/")
 
+MEM_LIMIT_CHROM = 1024*4
+MEM_LIMIT_MERGED = 1024*64
+
 rule all:
-    input: expand(str(OUT_DIR / "chr{chr}.clumped"),chr=CHROMS_INCLUDED)
+    input: OUT_DIR / "gwas_snps.clumped"
 
 # Filter 1K genomes panel to only include european individuals
 rule filter_sample_list:
@@ -49,23 +52,35 @@ rule norm_filter_bcf:
 
 # Rule to convert BCF to PLINK format
 rule vcf_to_plink:
-    input: 
-        vcf=rules.norm_filter_bcf.output,
+    input: vcf=rules.norm_filter_bcf.output,
     output: INT_DIR/"chr{chr}.bed"
     shell:
         """
-        plink --noweb \
+        plink --memory {MEM_LIMIT_CHROM} --noweb \
         --bcf {input.vcf} --keep-allele-order \
         --vcf-idspace-to _ --const-fid --allow-extra-chr 0 --split-x b37 no-fail \
         --make-bed --out {INT_DIR}/chr{wildcards.chr}
         """
 
-# Chromosome wise clumping of SNPs clumping of SNPs
+rule merge_chroms:	
+    input: expand(rules.vcf_to_plink.output,chr=CHROMS_INCLUDED)	
+    output: INT_DIR / "merged.bed"	
+    shell:	
+        """	
+        rm -f {INT_DIR}/merge_list	
+        for line in {CHROMS_INCLUDED}	
+        do	
+            echo "{INT_DIR}/chr$line" >> {INT_DIR}/merge_list	
+        done	
+        plink --memory {MEM_LIMIT_MERGED} --merge-list {INT_DIR}/merge_list --out {INT_DIR}/merged	
+        """	
+
+# Joint clumping of SNPs
 rule clump_snps:
-    input: data=rules.vcf_to_plink.output, asso=expand(str(ASSOC_DIR / "{study}"),study=STUDIES)
-    output: OUT_DIR / "chr{chr}.clumped"
+    input: data=rules.merge_chroms.output, asso=expand(str(ASSOC_DIR / "{study}"),study=STUDIES)
+    output: OUT_DIR / "gwas_snps.clumped"
     shell:
         """
         mkdir -p $(dirname "{output}")
-        plink --bfile {INT_DIR}/merged --clump {input.asso} --out {OUT_DIR}/chr{wildcards.chr}
+        plink --memory {MEM_LIMIT_MERGED} --bfile {INT_DIR}/merged --clump {input.asso} --out {OUT_DIR}/gwas_snps
         """
