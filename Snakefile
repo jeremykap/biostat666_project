@@ -5,8 +5,8 @@ Note: 1K Genomes to PLINK Modified from https://www.biostars.org/p/335605/
 
 from pathlib import Path
 
-CHROMS_INCLUDED = ["21","22"]
-STUDIES = ["adhd_jul2017","ocd_aug2017"]
+CHROMS_INCLUDED = [str(x) for x in range(1,23)]
+STUDIES = ["adhd_eur_jun2017","ocd_aug2017"]
 
 VCF_DIR = Path("input/vcf")
 ASSOC_DIR = Path("input/gwas")
