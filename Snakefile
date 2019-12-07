@@ -15,9 +15,12 @@ OUT_DIR = Path("output/")
 
 MEM_LIMIT_CHROM = 1024*4
 MEM_LIMIT_MERGED = 1024*64
-
+wildcard_constraints:
+        chr="\d+"
 rule all:
-    input: expand(str( OUT_DIR / "chr{chr}.clumped"),chr=CHROMS_INCLUDED)
+    input: 
+        expand(str( OUT_DIR / "chr{chr}_co.clumped"),chr=CHROMS_INCLUDED),
+        expand(str( OUT_DIR / "chr{chr}_{study}.clumped"),chr=CHROMS_INCLUDED,study=STUDIES),
 
 # Filter 1K genomes panel to only include european individuals
 rule filter_sample_list:
@@ -74,13 +77,25 @@ rule vcf_to_plink:
         """
 
 # Joint clumping of SNPs
-rule clump_snps:
+rule co_clump_snps:
     input: 
         data=rules.vcf_to_plink.output, 
         asso=expand(str(INT_DIR / "{study}_normed.assoc"),study=STUDIES)
-    output: OUT_DIR / "chr{chr}.clumped"
+    output: OUT_DIR / "chr{chr}_co.clumped"
     shell:
         """
         mkdir -p $(dirname "{output}")
-        plink --memory {MEM_LIMIT_CHROM} --bfile {INT_DIR}/chr{wildcards.chr} --clump {input.asso} --out {OUT_DIR}/chr{wildcards.chr}
+        plink --memory {MEM_LIMIT_CHROM} --bfile {INT_DIR}/chr{wildcards.chr} --clump {input.asso} --out {OUT_DIR}/chr{wildcards.chr}_co
+        """
+
+rule clump_snps:
+    input: 
+        data=rules.vcf_to_plink.output, 
+        asso=INT_DIR / "{study}_normed.assoc"
+    output: OUT_DIR / "chr{chr}_{study}.clumped"
+    shell:
+        """
+        mkdir -p $(dirname "{output}")
+        touch {output}
+        plink --memory {MEM_LIMIT_CHROM} --bfile {INT_DIR}/chr{wildcards.chr} --clump {input.asso} --out {OUT_DIR}/chr{wildcards.chr}_{wildcards.study}
         """
