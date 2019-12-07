@@ -20,7 +20,7 @@ wildcard_constraints:
 rule all:
     input: 
         expand(str( OUT_DIR / "chr{chr}_co.clumped"),chr=CHROMS_INCLUDED),
-        expand(str( OUT_DIR / "chr{chr}_{study}.clumped"),chr=CHROMS_INCLUDED,study=STUDIES),
+        expand(str(OUT_DIR / "merged_{study}.raw"),study=STUDIES),
 
 # Filter 1K genomes panel to only include european individuals
 rule filter_sample_list:
@@ -98,4 +98,30 @@ rule clump_snps:
         mkdir -p $(dirname "{output}")
         touch {output}
         plink --memory {MEM_LIMIT_CHROM} --bfile {INT_DIR}/chr{wildcards.chr} --clump {input.asso} --out {OUT_DIR}/chr{wildcards.chr}_{wildcards.study}
+        """
+
+rule extract_clumped_snps:
+    input: 
+        data=rules.vcf_to_plink.output,
+        clumped=OUT_DIR / "chr{chr}_{study}.clumped"
+    output:
+        INT_DIR/"chr{chr}_{study}.clumped.bed"
+    shell:
+        """
+        cut -f3 {input.clumped} > "snps.txt"
+        plink --bfile {INT_DIR}/chr{wildcards.chr} --allow-no-vars --extract snps.txt --noweb --make-bed  --out {INT_DIR}/chr{wildcards.chr}_{wildcards.study}.clumped
+        """
+
+rule make_merged_matrix:
+    input: expand(str( INT_DIR/"chr{chr}_{{study}}.clumped.bed"),chr=CHROMS_INCLUDED)
+    output: OUT_DIR / "merged_{study}.raw"
+    shell:
+        """
+        rm -f {INT_DIR}/merge_list
+        for line in {CHROMS_INCLUDED}	
+        do	
+            echo "{INT_DIR}/chr${{line}}_{wildcards.study}.clumped" >> {INT_DIR}/merge_list	
+        done
+        plink --memory {MEM_LIMIT_MERGED} --allow-no-vars --merge-list {INT_DIR}/merge_list --out {INT_DIR}/merged_{wildcards.study}	
+        plink --bfile {INT_DIR}/merged_{wildcards.study} --recodeA --noweb --out {OUT_DIR}/merged_{wildcards.study}	
         """
