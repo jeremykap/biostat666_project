@@ -108,8 +108,8 @@ rule extract_clumped_snps:
         INT_DIR/"chr{chr}_{study}.clumped.bed"
     shell:
         """
-        cut -f3 {input.clumped} > "snps.txt"
-        plink --memory {MEM_LIMIT_CHROM} --bfile {INT_DIR}/chr{wildcards.chr} --allow-no-vars --extract snps.txt --noweb --make-bed  --out {INT_DIR}/chr{wildcards.chr}_{wildcards.study}.clumped
+        awk '{{print $3}}' {input.clumped} > {INT_DIR}/snps_{wildcards.chr}_{wildcards.study}.txt
+        plink --memory {MEM_LIMIT_CHROM} --bfile {INT_DIR}/chr{wildcards.chr} --allow-no-vars --extract {INT_DIR}/snps_{wildcards.chr}_{wildcards.study}.txt --noweb --make-bed  --out {INT_DIR}/chr{wildcards.chr}_{wildcards.study}.clumped
         """
 
 rule make_merged_matrix:
