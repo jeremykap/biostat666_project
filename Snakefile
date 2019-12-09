@@ -11,7 +11,7 @@ STUDIES = ["adhd_eur_jun2017","ocd_aug2017"]
 VCF_DIR = Path("input/vcf")
 ASSOC_DIR = Path("input/gwas")
 INT_DIR = Path("intermediate/")
-OUT_DIR = Path("output/")
+OUT_DIR = Path("output_aswitch/")
 
 MEM_LIMIT_CHROM = 1024*4
 MEM_LIMIT_MERGED = 1024*64
@@ -32,10 +32,10 @@ rule filter_sample_list:
         """
 rule reformat_assoc:
     input: ASSOC_DIR = ASSOC_DIR / "{study}"
-    output: INT_DIR / "{study}_normed.assoc"
+    output: OUT_DIR / "{study}_normed.assoc"
     shell:
         """
-        awk 'NR==1; NR>1 {{$2 = $1":"$3":"$5":"$4; print}}' {input} > {output} 
+        awk 'NR==1; NR>1 {{$2 = $1":"$3":"$4":"$5; print}}' {input} > {output} 
         """
 rule vcf_to_bcf:
     input: 
@@ -80,7 +80,7 @@ rule vcf_to_plink:
 rule co_clump_snps:
     input: 
         data=rules.vcf_to_plink.output, 
-        asso=expand(str(INT_DIR / "{study}_normed.assoc"),study=STUDIES)
+        asso=expand(str(OUT_DIR / "{study}_normed.assoc"),study=STUDIES)
     output: OUT_DIR / "chr{chr}_co.clumped"
     shell:
         """
@@ -91,7 +91,7 @@ rule co_clump_snps:
 rule clump_snps:
     input: 
         data=rules.vcf_to_plink.output, 
-        asso=INT_DIR / "{study}_normed.assoc"
+        asso=OUT_DIR / "{study}_normed.assoc"
     output: OUT_DIR / "chr{chr}_{study}.clumped"
     shell:
         """
